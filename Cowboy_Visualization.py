@@ -39,21 +39,22 @@ def find(df, c, dr, outcut, incut):
                  df[int(np.floor((a - incut) / dr)), int(np.floor((b - incut) / dr)), int((c - incut) / dr)]) + \
                 ((b - incut) / dr - np.floor((b - incut) / dr)) * \
                 (df[int(np.floor((a - incut) / dr)), int(np.ceil((b - incut) / dr)), int((c - incut) / dr)] -
-                 df[int(np.floor((a - incut) / dr)), int(np.floor((b - incut) / dr)), int((c - incut) / dr)])  # would usually be over (x2-x1) but is = 1 always
+                 df[int(np.floor((a - incut) / dr)), int(np.floor((b - incut) / dr)), int((c - incut) / dr)])
+                  # would usually be over (x2-x1) but is = 1 always
 
     return energy
 
 
 n = 0
-data = pd.read_csv('/Users/btsund/Downloads/chimes_scan_3b.type_0.C.dat', sep='\s+')
+data = pd.read_csv('/Users/btsund/Downloads/chimes_scan_3b.type_0 (2).dat', sep='\s+')
 df = data.to_numpy()
 dr = float(data.columns[3])
 outer_cutoff = float(data.columns[2])
 inner_cutoff = float(data.columns[1])
 math = df.shape[0]
-iterations = int((math * dr ** 3) ** (1 / 3) / dr)
+iterations = int(round((math * dr ** 3) ** (1 / 3) / dr, 4))
 volume = np.ones([iterations, iterations, iterations])
-sort = data.sort_values(by=[str(dr)], ascending=True)
+sort = data.sort_values(by=[data.columns[3]], ascending=True)
 minval = df[sort.index[int(math * .0025)], 3]
 maxval = df[sort.index[-2], 3]
 for x in range(iterations):
@@ -61,12 +62,18 @@ for x in range(iterations):
         for z in range(iterations):
             volume[x, y, z] = df[n, 3]
             n += 1
+
+if round(volume[0,0,1],4) != round(volume[0,1,0],4):
+    if round(volume[1,0,0],4) == round(volume[0,1,0],4):
+        volume = np.swapaxes(volume, 0, 2)
+    else:
+        volume = np.swapaxes(volume, 0, 1)
 # Define frames
 fig = go.Figure(frames=[go.Frame(data=[go.Surface(
     z=find(volume, round(k, 4), dr, outer_cutoff, inner_cutoff),
     x=(np.arange(-outer_cutoff, outer_cutoff, dr)-k/2),
     y=np.arange(-outer_cutoff, outer_cutoff, dr),
-    cmin=-maxval, cmax=maxval),
+    cmin=-np.min([abs(maxval), abs(minval)]), cmax=np.min([abs(maxval), abs(minval)])),
     go.Scatter3d(x=[-k/2, k/2], y=[0, 0], z=[0, 0], mode='markers')],
     name=str(k))
     for k in np.arange(inner_cutoff, outer_cutoff, dr)])
@@ -74,9 +81,9 @@ fig = go.Figure(frames=[go.Frame(data=[go.Surface(
 # Add data to be displayed before animation starts
 fig.add_trace(go.Surface(
     z=find(volume, inner_cutoff, dr, outer_cutoff, inner_cutoff),
-    x=np.arange(-outer_cutoff, outer_cutoff, dr),
+    x=np.arange(-outer_cutoff, outer_cutoff, dr)-inner_cutoff/2,
     y=np.arange(-outer_cutoff, inner_cutoff + outer_cutoff, dr),
-    cmin=-maxval, cmax=maxval, colorscale='RdBu_r',
+    cmin=-np.min([abs(maxval), abs(minval)]), cmax=np.min([abs(maxval), abs(minval)]), colorscale='RdBu_r',
     colorbar=dict(thickness=20, ticklen=4)))
 
 fig.add_scatter3d(x=[0,inner_cutoff], y=[0, 0], z=[0, 0], mode='markers')
